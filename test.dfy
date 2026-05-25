@@ -228,27 +228,257 @@
 // }
 
 
+// // E1 program:
+// method ProgramProduct(N: int, B: int, C: int)
+//     returns (x: int, x': int)
+//     requires N >= 0
+//     ensures x == x'
+// {
+//     var i  := 0;
+//     var i' := 0;
+//     var j' := C;
+//     var j  := 0;
+//     x  := 0;
+//     x' := 0;
 
-method Product(N: int) returns (x: int, y: int)
-  requires N >= 0
-  ensures x == y
+//     while (i < N && i' < N)
+//         invariant i == i'
+//         invariant j' == i' * B + C
+//         invariant x == x'
+//         invariant 0 <= i <= N
+//     {
+//         // Source program step
+//         j  := i * B + C;
+//         x  := x  + j;
+//         i  := i  + 1;
+
+//         // Optimized program step
+//         x' := x' + j';
+//         j' := j' + B;
+//         i' := i' + 1;
+//     }
+// }
+
+// // E2 program:
+// method Product(N: int) returns (x: int, y: int)
+//   requires N >= 0
+//   ensures x == y
+// {
+//     x := 0;
+//     var i := 0;
+//     x := x + i;
+//     i := i + 1;
+//     var j := 1;
+//     y := 0;
+//     while i <= N
+//         invariant i == j           // structural sync between i and j
+//         invariant x == y           // relational invariant (key)
+//         // invariant i >= 1
+//         // invariant i <= N + 1
+//         // invariant x == i * (i - 1) / 2   // arithmetic witness
+//     {
+//         y := y + j;
+//         j := j + 1;
+//         x := x + i;
+//         i := i + 1;
+//     }
+// }
+
+
+
+
+
+
+// E3 program: Loop Alignment product program (Fig. 7) of the paper.
+// method LoopAlignment(
+//     a    : array<int>,
+//     aBar : array<int>,
+//     N    : int)
+//     returns (
+//         b    : array<int>,
+//         bBar : array<int>,
+//         d    : array<int>,
+//         dBar : array<int>)
+
+//     requires N >= 1
+//     requires a.Length    == N + 1
+//     requires aBar.Length == N + 1
+//     requires forall k :: 0 <= k <= N ==> a[k] == aBar[k]
+//     ensures  b.Length    == N + 1
+//     ensures  bBar.Length == N + 1
+//     ensures  d.Length    == N + 1
+//     ensures  dBar.Length == N + 1
+//     // Postcondition
+//     ensures  forall k :: 1 <= k <= N ==> d[k] == dBar[k]
+// {
+//     b    := new int[N + 1];
+//     bBar := new int[N + 1];
+//     d    := new int[N + 1];
+//     dBar := new int[N + 1];
+
+//     // Establish b[0] = b_bar[0] from precondition a = a_bar
+//     b[0]    := a[0];
+//     bBar[0] := aBar[0];
+
+//     // ── Prologue 
+//     var i := 1;
+//     var j := 1;
+
+//     assert i <= N;
+//     // Source: first iteration runs alone
+//     b[i] := a[i];
+//     d[i] := b[i - 1];
+//     i    := i + 1;
+
+//     // Transformed: paired init step
+//     dBar[1] := bBar[0];
+
+//     // Alignment sync assertion (Fig. 7): assert(i ≤ N <==> j ≤ N−1)
+//     assert (i <= N) == (j <= N - 1);
+
+//     while i <= N
+//     invariant i == j + 1
+//     invariant 2 <= i <= N + 1
+//     invariant 1 <= j <= N
+//     invariant forall k :: 1 <= k < i ==> b[k] == a[k]
+//     invariant forall k :: 1 <= k < i ==> d[k] == b[k - 1]
+//     invariant forall k :: 1 <= k < i ==> d[k] == dBar[k]
+//     {
+//         // ── Source step
+//         b[i] := a[i];
+//         d[i] := b[i - 1];
+//         i    := i + 1;
+
+//         // ── Transformed step 
+//         bBar[j] := aBar[j];
+//         dBar[j + 1] := bBar[j];
+//         j    := j + 1;
+
+//         assert (i <= N) == (j <= N - 1);
+//     }
+
+//     bBar[N] := aBar[N];
+// }
+
+
+// E4 program:
+method ProductProgram(
+    N      : int,
+    a      : array<int>,  // source arrays
+    b      : array<int>,
+    c      : array<int>,
+    a_bar  : array<int>,  // transformed (pipelined) arrays
+    b_bar  : array<int>,
+    c_bar  : array<int>
+)
+    // Paper states: "assume a, b, c are arrays of size N, with 2 <= N"
+    requires N >= 2
+    requires a.Length == N && b.Length == N && c.Length == N
+    requires a_bar.Length == N && b_bar.Length == N && c_bar.Length == N
+
+    // No aliasing between any pair of arrays
+    requires a != b && a != c && a != a_bar && a != b_bar && a != c_bar
+    requires b != c && b != a_bar && b != b_bar && b != c_bar
+    requires c != a_bar && c != b_bar && c != c_bar
+    requires a_bar != b_bar && a_bar != c_bar
+    requires b_bar != c_bar
+
+    modifies a, b, c, a_bar, b_bar, c_bar
+
+    // ── Pre-condition: { a = a_bar /\ b = b_bar /\ c = c_bar } ──────────
+    requires forall k :: 0 <= k < N ==> a[k] == a_bar[k]
+    requires forall k :: 0 <= k < N ==> b[k] == b_bar[k]
+    requires forall k :: 0 <= k < N ==> c[k] == c_bar[k]
+
+    // ── Post-condition: { a = a_bar /\ b = b_bar /\ c = c_bar } ─────────
+    ensures forall k :: 0 <= k < N ==> a[k] == a_bar[k]
+    ensures forall k :: 0 <= k < N ==> b[k] == b_bar[k]
+    ensures forall k :: 0 <= k < N ==> c[k] == c_bar[k]
 {
-    x := 0;
+
     var i := 0;
-    x := x + i;
+    var j := 0;
+
+    assert i < N;
+
+    // ── Source: first iteration (i = 0) ─────────────────────────────────
+    a[i] := a[i]    + 1;
+    b[i] := b[i]    + a[i];
+    c[i] := c[i]    + b[i];
     i := i + 1;
-    var j := 1;
-    y := 0;
-    while i <= N
-        invariant i == j           // structural sync between i and j
-        invariant x == y           // relational invariant (key)
-        // invariant i >= 1
-        // invariant i <= N + 1
-        // invariant x == i * (i - 1) / 2   // arithmetic witness
+
+    a_bar[0] := a_bar[0] + 1;
+    b_bar[0] := b_bar[0] + a_bar[0];
+
+    assert i < N;
+
+    a[i]    := a[i]    + 1;
+    b[i]    := b[i]    + a[i];
+    c[i]    := c[i]    + b[i];
+    i       := i + 1;
+
+
+    a_bar[1] := a_bar[1] + 1;
+
+    assert (i < N) == (j < N - 2);
+
+    while i < N
+    invariant 0 <= j && i == j + 2 && j <= N - 2
+
+    // ── Source array state ────────────────────────────────────────────────
+    // Source loop has processed indices 0..i-1 already
+    invariant forall k :: 0 <= k < i ==>
+        a[k] == old(a[k]) + 1
+
+    invariant forall k :: 0 <= k < i ==>
+        b[k] == old(b[k]) + (old(a[k]) + 1)
+
+    invariant forall k :: 0 <= k < i ==>
+        c[k] == old(c[k]) + (old(b[k]) + (old(a[k]) + 1))
+
+    // Source is unchanged for indices i..N-1
+    invariant forall k :: i <= k < N ==>
+        a[k] == old(a[k]) && b[k] == old(b[k]) && c[k] == old(c[k])
+
+    // ── Bar array state (pipelined, 2-cycle lag) ─────────────────────────
+
+    // Stage A: a_bar is done for indices 0..j+1 (two ahead of c_bar)
+    invariant forall k :: 0 <= k <= j + 1 ==>
+        a_bar[k] == old(a_bar[k]) + 1
+
+    invariant forall k :: j + 2 <= k < N ==>
+        a_bar[k] == old(a_bar[k])
+
+    // Stage B: b_bar is done for indices 0..j (one ahead of c_bar)
+    invariant forall k :: 0 <= k <= j ==>
+        b_bar[k] == old(b_bar[k]) + (old(a_bar[k]) + 1)
+
+    invariant forall k :: j + 1 <= k < N ==>
+        b_bar[k] == old(b_bar[k])
+
+    // Stage C: c_bar is done for indices 0..j-1
+    invariant forall k :: 0 <= k < j ==>
+        c_bar[k] == old(c_bar[k]) + (old(b_bar[k]) + (old(a_bar[k]) + 1))
+
+    invariant forall k :: j <= k < N ==>
+        c_bar[k] == old(c_bar[k])
     {
-        y := y + j;
-        j := j + 1;
-        x := x + i;
+        //Source loop body
+        a[i] := a[i] + 1;
+        b[i] := b[i] + a[i];
+        c[i] := c[i] + b[i];
         i := i + 1;
+
+        // ── Transformed loop body 
+        a_bar[j + 2] := a_bar[j + 2] + 1;
+        b_bar[j + 1] := b_bar[j + 1] + a_bar[j + 1];
+        c_bar[j] := c_bar[j]     + b_bar[j];
+        j := j + 1;
+
+        // assert(i < N  <=>  j < N-2)  [inside loop, Fig. 6]
+        assert (i < N) == (j < N - 2);
     }
+    c_bar[j] := c_bar[j]     + b_bar[j];
+    b_bar[j + 1] := b_bar[j + 1] + a_bar[j + 1];
+    c_bar[j + 1] := c_bar[j + 1] + b_bar[j + 1];
 }
