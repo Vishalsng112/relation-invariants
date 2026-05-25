@@ -1,0 +1,8 @@
+E1: Basic Prompt
+E2: Basic Prompt
+E3: Basic Prompt
+E4: Basic Prompt
+E5:
+E6: Basic Prompt
+E7: -----
+E8: -----
