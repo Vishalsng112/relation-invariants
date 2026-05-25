@@ -141,88 +141,114 @@
 //      (3)  d[1..i]   == d_bar[1..i]        d prefixes equal
 // ============================================================
 
-method LoopAlignment(N: int,
-                     a:     seq<int>,   // source input array  (0-indexed, length N+1)
-                     a_bar: seq<int>)   // transformed input array (0-indexed, length N+1)
-    requires N >= 1
-    requires |a|     == N + 1
-    requires |a_bar| == N + 1
-    // Pre-condition from product program: a == a_bar /\ b[0] == b_bar[0]
-    requires a == a_bar
+// method LoopAlignment(N: int,
+//                      a:     seq<int>,   // source input array  (0-indexed, length N+1)
+//                      a_bar: seq<int>)   // transformed input array (0-indexed, length N+1)
+//     requires N >= 1
+//     requires |a|     == N + 1
+//     requires |a_bar| == N + 1
+//     // Pre-condition from product program: a == a_bar /\ b[0] == b_bar[0]
+//     requires a == a_bar
+// {
+//     // ---------- Source program variables ----------
+//     var b  : array<int> := new int[N + 1];
+//     var d  : array<int> := new int[N + 1];
+
+//     // ---------- Transformed program variables -----
+//     var b_bar : array<int> := new int[N + 1];
+//     var d_bar : array<int> := new int[N + 1];
+
+//     // ---------- Shared initial value of b[0] / b_bar[0] ----------
+//     // (pre-condition: b[0] == b_bar[0]; we set both to 0 as a concrete witness)
+//     b[0]     := 0;
+//     b_bar[0] := 0;
+
+//     // ---------- Product program initialisation ----------
+//     var i : int := 1;
+//     var j : int := 1;
+
+//     // First iteration of source (align prologue)
+//     assert i <= N;
+//     b[i]     := a[i];
+//     d[i]     := b[i - 1];
+//     i        := i + 1;
+
+//     // Transformed prologue: d_bar[1] := b_bar[0]
+//     d_bar[1] := b_bar[0];
+
+//     // Sync assertion before main loop
+//     assert i == j + 1;   // i has advanced one step ahead of j
+
+//     // ---------- Product program main loop ----------
+//     // We re-align: after source's first step i==2, transformed starts j==1.
+//     // Re-set to lock-step from here: drive both with a single counter k.
+//     // We use i for the source (already at 2) and j for transformed (at 1).
+
+//     while (i <= N)
+//         decreases N - i + 1
+
+//         // ── Relational Invariants ─────────────────
+//         // (1) counters: source is one ahead of transformed
+//         invariant j == i - 1
+
+//         // (2) range
+//         invariant 1 <= i <= N + 1
+//         invariant 1 <= j <= N
+
+//         // (3) b prefixes agree up to j (= i-1)
+//         // invariant forall k :: 0 <= k <= j ==> b[k] == b_bar[k]
+
+//         // (4) d prefixes agree up to i-1 (= j)
+//         invariant forall k :: 1 <= k <= j ==> d[k] == d_bar[k]
+
+//         // (5) b values match the input arrays (copied correctly)
+//         invariant forall k :: 1 <= k <= j ==> b[k] == a[k]
+//         // invariant forall k :: 1 <= k <= j ==> b_bar[k] == a_bar[k]
+//     {
+//         // ── Source body ───────────────────────────
+//         b[i]     := a[i];
+//         d[i]     := b[i - 1];
+//         i        := i + 1;
+
+//         // ── Transformed body ─────────────────────
+//         b_bar[j] := a_bar[j];
+//         d_bar[j + 1] := b_bar[j];
+//         j        := j + 1;
+
+//         // ── Sync assertion inside loop ────────────
+//         assert j == i - 1;
+//     }
+
+//     // ---------- Transformed epilogue ----------
+//     b_bar[N] := a_bar[N];
+
+//     // ---------- Post-condition ------------------
+//     // d[1..N] == d_bar[1..N]
+//     assert forall k :: 1 <= k <= N ==> d[k] == d_bar[k];
+// }
+
+
+
+method Product(N: int) returns (x: int, y: int)
+  requires N >= 0
+  ensures x == y
 {
-    // ---------- Source program variables ----------
-    var b  : array<int> := new int[N + 1];
-    var d  : array<int> := new int[N + 1];
-
-    // ---------- Transformed program variables -----
-    var b_bar : array<int> := new int[N + 1];
-    var d_bar : array<int> := new int[N + 1];
-
-    // ---------- Shared initial value of b[0] / b_bar[0] ----------
-    // (pre-condition: b[0] == b_bar[0]; we set both to 0 as a concrete witness)
-    b[0]     := 0;
-    b_bar[0] := 0;
-
-    // ---------- Product program initialisation ----------
-    var i : int := 1;
-    var j : int := 1;
-
-    // First iteration of source (align prologue)
-    assert i <= N;
-    b[i]     := a[i];
-    d[i]     := b[i - 1];
-    i        := i + 1;
-
-    // Transformed prologue: d_bar[1] := b_bar[0]
-    d_bar[1] := b_bar[0];
-
-    // Sync assertion before main loop
-    assert i == j + 1;   // i has advanced one step ahead of j
-
-    // ---------- Product program main loop ----------
-    // We re-align: after source's first step i==2, transformed starts j==1.
-    // Re-set to lock-step from here: drive both with a single counter k.
-    // We use i for the source (already at 2) and j for transformed (at 1).
-
-    while (i <= N)
-        decreases N - i + 1
-
-        // ── Relational Invariants ─────────────────
-        // (1) counters: source is one ahead of transformed
-        invariant j == i - 1
-
-        // (2) range
-        invariant 1 <= i <= N + 1
-        invariant 1 <= j <= N
-
-        // (3) b prefixes agree up to j (= i-1)
-        // invariant forall k :: 0 <= k <= j ==> b[k] == b_bar[k]
-
-        // (4) d prefixes agree up to i-1 (= j)
-        invariant forall k :: 1 <= k <= j ==> d[k] == d_bar[k]
-
-        // (5) b values match the input arrays (copied correctly)
-        invariant forall k :: 1 <= k <= j ==> b[k] == a[k]
-        // invariant forall k :: 1 <= k <= j ==> b_bar[k] == a_bar[k]
+    x := 0;
+    var i := 0;
+    x := x + i;
+    i := i + 1;
+    var j := 1;
+    y := 0;
+    while i <= N
+        invariant i == j           // structural sync between i and j
+        invariant x == y           // relational invariant (key)
+        // invariant i >= 1
+        // invariant i <= N + 1
+        // invariant x == i * (i - 1) / 2   // arithmetic witness
     {
-        // ── Source body ───────────────────────────
-        b[i]     := a[i];
-        d[i]     := b[i - 1];
-        i        := i + 1;
-
-        // ── Transformed body ─────────────────────
-        b_bar[j] := a_bar[j];
-        d_bar[j + 1] := b_bar[j];
-        j        := j + 1;
-
-        // ── Sync assertion inside loop ────────────
-        assert j == i - 1;
+        y := y + j;
+        j := j + 1;
+        x := x + i;
+        i := i + 1;
     }
-
-    // ---------- Transformed epilogue ----------
-    b_bar[N] := a_bar[N];
-
-    // ---------- Post-condition ------------------
-    // d[1..N] == d_bar[1..N]
-    assert forall k :: 1 <= k <= N ==> d[k] == d_bar[k];
 }
